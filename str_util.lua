@@ -11,15 +11,32 @@ function line_wrap(s, n)
 
    while p ~= nil do
       f = s:find(" ", p + 1)
-      if f == nil then
-         f = #s
-         b = true
+      if br ~= nil then
+         if br < p then
+            br = p
+         end
+         br = s:find("\n", br + 1)
       end
+
+      if f == nil then
+         if br then
+            f = br
+         else
+            f = #s
+            b = true
+         end
+      else 
+         if br and f > br then
+            f = br
+         end
+      end
+
       if (l + f - p) <= n then
          l = l + f - p -- still fits in the line
       else
          if p > 0 then
-            if s:sub(p-l, p-l) == " " then
+            if s:sub(p-l, p-l) == " " or
+               s:sub(p-l, p-l) == "\n" then
                table.insert(lines, s:sub(p-l+1, p-1))
             else
                table.insert(lines, s:sub(p-l, p-1))
@@ -32,7 +49,8 @@ function line_wrap(s, n)
       if b then
          if l > 0 then
             p = p + 1
-            if s:sub(p-l, p-l) == " " then
+            if s:sub(p-l, p-l) == " " or
+               s:sub(p-l, p-l) == "\n" then
                table.insert(lines, s:sub(p-l+1, f))
             else
                table.insert(lines, s:sub(p-l, f))
@@ -40,7 +58,6 @@ function line_wrap(s, n)
          end
          break
       end
-
    end
 
    return lines
