@@ -1,4 +1,14 @@
-module(..., package.seeall)
+local string = string
+local print = print
+local ipairs = ipairs
+local pairs = pairs
+local table = table
+local mod= {}
+if setfenv then
+   setfenv(1, mod) -- lua 5.1
+else
+   _ENV = mod -- lua 5.2
+end
 
 -- Divide uma string s em várias de tamanho máximo n cada
 function line_wrap(s, n)
@@ -64,13 +74,13 @@ function line_wrap(s, n)
 end
 
 function line_wrap_with_prefix(s, n, prefix)
-   local s = ""
+   local out = ""
    local t = line_wrap(s,n)
    for i, j in ipairs(t) do
-      s = s .. prefix .. j .. "\n"
+      out = out .. prefix .. j .. "\n"
    end
 
-   return s
+   return out
 end
 
 function remove_acentos(s)
@@ -121,3 +131,5 @@ function camel_case(s)
    s = s:gsub(" ", "")
    return s
 end
+
+return mod
