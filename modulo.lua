@@ -2,11 +2,13 @@
 
 local str_util = require("str_util")
 local io = io
+local os = os
 local string = string
 local print = print
 local ipairs = ipairs
 local tostring = tostring
 local assert = assert
+local type = type
 local mod= {}
 if setfenv then
    setfenv(1, mod) -- lua 5.1
@@ -55,7 +57,7 @@ local function abrir_arquivos()
 end
 
 -- params: file, tabela, tamanho da linha
-local function imprimir_params(f, t, lin_size)
+local function imprimir_desc_params(f, t, lin_size)
    local max_len = 0
 
    assert(t)
@@ -86,11 +88,12 @@ end
 local function criar_header()
    local f = f_header
    local id = params.id
-   local define = string.upper(params.nome:gsub(" ",""))
+   local nome = str_util.remove_acentos(params.nome)
+   local define = string.upper(nome:gsub(" ","_"))
 
    f:write("#if ! defined( "..define.."_ )\n")
    f:write("#define "..define.."_\n")
-   f:write("/***************************************************************************\n")
+   f:write("/**********************************************************************\n")
    f:write("*\n")
    f:write("*  $MCD Módulo de definição: Módulo "..params.nome.."\n")
    f:write("*\n")
@@ -103,17 +106,17 @@ local function criar_header()
    f:write("*\n")
    f:write("*  $HA Histórico de evolução:\n")
    f:write("*     Versão  Autor    Data     Observações\n")
-   f:write("*       1.00   ???   21/08/2015 Início do desenvolvimento\n")
+   f:write("*       1.00   ???   "..os.date("%d/%m/%Y").." Início do desenvolvimento\n")
    f:write("*\n")
    f:write("*  $ED Descrição do módulo\n")
    f:write("*     Descrição...\n")
    f:write("*\n")
-   f:write("***************************************************************************/\n")
-
+   f:write("***********************************************************************/\n")
+   f:write("\n")
    f:write("\n")
    f:write("/***********************************************************************\n")
    f:write("*\n")
-   f:write("*  $TC Tipo de dados: "..id.." Condicoes de retorno\n")
+   f:write("*  $TC Tipo de dados: "..id.." Condições de retorno\n")
    f:write("*\n")
    f:write("*\n")
    f:write("***********************************************************************/\n")
@@ -121,41 +124,65 @@ local function criar_header()
    f:write("   typedef enum {\n")
    f:write("\n")
 
-   local i, cr
-   for i,cr in ipairs(params.cond_ret) do
-      f:write("      "..id.."_CondRet"..cr[1].." = "..tostring(i-1).." ,\n")
-      f:write("          /* "..cr[2].." */\n")
+   local cr
+   for cr = 1,#params.cond_ret-1 do
+      f:write("      "..id.."_CondRet"..params.cond_ret[cr][1].." = "..tostring(cr-1).." ,\n")
+      f:write("          /* "..params.cond_ret[cr][2].." */\n")
       f:write("\n")
    end
+-- não colocar vírgula no último
+   cr = #params.cond_ret
+   f:write("      "..id.."_CondRet"..params.cond_ret[cr][1].." = "..tostring(cr-1).."\n")
+   f:write("          /* "..params.cond_ret[cr][2].." */\n")
+   f:write("\n")
 
    f:write("   } "..id.."_tpCondRet ;\n")
    f:write("\n")
    f:write("\n")
 
-   local fn
+   local i, fn
    for i,fn in ipairs(params.funcoes) do
       -- fn = {'Nome da função', 'Descrição', Retornos, Parâmetros, Privada}
       if not fn[5] then -- não é privada
          f:write("/***********************************************************************\n")
          f:write("*\n")
-         f:write("*  $FC Função: "..id.." "..str_util.camel_case(fn[1]).."\n")
+         f:write("*  $FC Função: "..id.." "..fn[1].."\n")
          f:write("*\n")
          f:write("*  $ED Descrição da função\n")
-         f:write(str_util.line_wrap_with_prefix(fn[2], 65, "*   "))
+         f:write(str_util.line_wrap_with_prefix(fn[2], 65, "*     "))
          f:write("*\n")
          f:write("*  $EP Parâmetros\n")
-         imprimir_params(f, fn[4], 72)
+         imprimir_desc_params(f, fn[4], 72)
          f:write("*\n")
          f:write("*  $FV Valor retornado\n")
          for j,ret in ipairs(fn[3]) do
             f:write("*     "..id.."_CondRet"..ret.."\n")
          end
+         f:write("*\n")
+         f:write("***********************************************************************/\n")
+         f:write("\n")
+
+         if type(fn[3]) == "string" then
+            f:write("   "..fn[3].." ")
+         else
+            f:write("   "..id.."_tpCondRet ")
+         end
+
+         f:write(str_util.camel_case(fn[1]).."( ")
+         if (not fn[4]) or (#fn[4] == 0) then
+            f:write("void ) ;\n") -- nenhum parâmetro
+         else
+            -- Primeiro parâmetro sem vírgula antes
+            f:write(fn[4][1][2].." "..fn[4][1][1])
+            for p = 2,#fn[4] do
+--             fn[4][p] = {"Nome", "tipo", "descrição"}
+               f:write(" , "..fn[4][p][2].." "..fn[4][p][1])
+            end
+            f:write(" ) ;\n")
+         end
       end
    end
 
-   f:write("*\n")
-   f:write("***********************************************************************/\n")
-   f:write("\n")
    f:flush()
    f:close()
 end

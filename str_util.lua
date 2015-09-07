@@ -4,6 +4,7 @@ local ipairs = ipairs
 local pairs = pairs
 local table = table
 local mod= {}
+
 if setfenv then
    setfenv(1, mod) -- lua 5.1
 else
