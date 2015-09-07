@@ -9,6 +9,7 @@ local ipairs = ipairs
 local tostring = tostring
 local assert = assert
 local type = type
+local table = table
 local mod= {}
 if setfenv then
    setfenv(1, mod) -- lua 5.1
@@ -22,15 +23,14 @@ local params = {}
 
 -- Cria os handles dos arquivos
 local function abrir_arquivos()
-   --[[
    f_code = io.open(params.arq_code, "w")
    if (f_code == nil) then
       return false
    end
---]]
+
    f_header = io.open(params.arq_head, "w")
    if (f_header == nil) then
-    --  f_code:close()
+      f_code:close()
       return false
    end
 
@@ -54,6 +54,52 @@ local function abrir_arquivos()
    end
 
    return true
+end
+
+-- params: file, nome do arquivo, nome do modulo
+local function imprimir_cabecalho(f, nome_arq, modulo)
+   f:write("/**********************************************************************\n")
+   f:write("*\n")
+   f:write("*  $MCD Módulo de definição: Módulo "..modulo.."\n")
+   f:write("*\n")
+   f:write("*  Arquivo gerado:              "..nome_arq.."\n")
+   f:write("*  Letras identificadoras:      "..params.id.."\n")
+   f:write("*\n")
+   f:write("*  Projeto: Disciplina INF 1301\n")
+   f:write("*  Autores:\n")
+   f:write("*           \n")
+   f:write("*\n")
+   f:write("*  $HA Histórico de evolução:\n")
+   f:write("*     Versão  Autor    Data     Observações\n")
+   f:write("*       1.00   ???   "..os.date("%d/%m/%Y").." Início do desenvolvimento\n")
+   f:write("*\n")
+   f:write("*  $ED Descrição do módulo\n")
+   f:write("*     Descrição...\n")
+   f:write("*\n")
+   f:write("***********************************************************************/\n")
+end
+
+-- params: file, função
+local function  imprimir_prototipo(f, fn)
+   -- imrprime tipo de retorno
+   if type(fn[3]) == "string" then
+      f:write("   "..fn[3].." ")
+   else
+      f:write("   "..params.id.."_tpCondRet ")
+   end
+
+   f:write(str_util.camel_case(fn[1]).."( ")
+   if (not fn[4]) or (#fn[4] == 0) then
+      f:write("void )") -- nenhum parâmetro
+   else
+      -- Primeiro parâmetro sem vírgula antes
+      f:write(fn[4][1][2].." "..fn[4][1][1])
+      for p = 2,#fn[4] do
+         -- fn[4][p] = {"Nome", "tipo", "descrição"}
+         f:write(" , "..fn[4][p][2].." "..fn[4][p][1])
+      end
+      f:write(" )")
+   end
 end
 
 -- params: file, tabela, tamanho da linha
@@ -93,25 +139,7 @@ local function criar_header()
 
    f:write("#if ! defined( "..define.."_ )\n")
    f:write("#define "..define.."_\n")
-   f:write("/**********************************************************************\n")
-   f:write("*\n")
-   f:write("*  $MCD Módulo de definição: Módulo "..params.nome.."\n")
-   f:write("*\n")
-   f:write("*  Arquivo gerado:              "..params.arq_head.."\n")
-   f:write("*  Letras identificadoras:      "..id.."\n")
-   f:write("*\n")
-   f:write("*  Projeto: Disciplina INF 1301\n")
-   f:write("*  Autores:\n")
-   f:write("*           \n")
-   f:write("*\n")
-   f:write("*  $HA Histórico de evolução:\n")
-   f:write("*     Versão  Autor    Data     Observações\n")
-   f:write("*       1.00   ???   "..os.date("%d/%m/%Y").." Início do desenvolvimento\n")
-   f:write("*\n")
-   f:write("*  $ED Descrição do módulo\n")
-   f:write("*     Descrição...\n")
-   f:write("*\n")
-   f:write("***********************************************************************/\n")
+   imprimir_cabecalho(f, params.arq_head, params.nome)
    f:write("\n")
    f:write("\n")
    f:write("/***********************************************************************\n")
@@ -162,30 +190,62 @@ local function criar_header()
          f:write("***********************************************************************/\n")
          f:write("\n")
 
-         if type(fn[3]) == "string" then
-            f:write("   "..fn[3].." ")
-         else
-            f:write("   "..id.."_tpCondRet ")
-         end
-
-         f:write(str_util.camel_case(fn[1]).."( ")
-         if (not fn[4]) or (#fn[4] == 0) then
-            f:write("void ) ;\n") -- nenhum parâmetro
-         else
-            -- Primeiro parâmetro sem vírgula antes
-            f:write(fn[4][1][2].." "..fn[4][1][1])
-            for p = 2,#fn[4] do
---             fn[4][p] = {"Nome", "tipo", "descrição"}
-               f:write(" , "..fn[4][p][2].." "..fn[4][p][1])
-            end
-            f:write(" ) ;\n")
-         end
+         imprimir_prototipo(f, fn)
+         f:write(" ;\n")
       end
    end
 
    f:flush()
    f:close()
 end
+
+-- Retorna uma tabela com as funções privadas do módulo
+local function funcoes_privadas()
+   local t = {}
+   local i,fn
+   for i,fn in ipairs(params.funcoes) do
+      if fn[5] == true then
+         table.insert(t, fn)
+      end
+   end
+
+   return t
+end
+
+local function criar_code()
+   local f = f_code
+   local func_p = funcoes_privadas()
+
+   imprimir_cabecalho(f, params.arq_code, params.nome)
+   f:write("\n")
+   f:write('#include   <stdio.h>\n')
+   f:write('#include   <stdlib.h>\n')
+   f:write('#include   "'..params.arq_head..'"\n')
+   f:write("\n")
+
+-- Protótipos das funções privadas / static
+   if #func_p > 0 then
+      f:write("/***** Protótipos das funções encapuladas no módulo *****/\n")
+      f:write("\n")
+   end
+
+   local i,fn
+   for i,fn in ipairs(func_p) do
+      -- fn = {'Nome da função', 'Descrição', Retornos, Parâmetros, Privada}
+      imprimir_prototipo(f, fn)
+      f:write(" ;\n")
+      f:write("\n")
+   end
+
+   f:write("\n")
+   f:write("/*****  Código das funções exportadas pelo módulo  *****/\n")
+   f:write("\n")
+
+
+   f:flush()
+   f:close()
+end
+
 
 -- Parâmetros:
 -- nome: Nome do módulo
@@ -223,6 +283,7 @@ function criar_modulo(nome, id, testes, cond_ret, funcoes, arq_code, arq_head, a
    end
 
    criar_header()
+   criar_code()
 end
 
 
