@@ -80,12 +80,12 @@ local function imprimir_cabecalho(f, nome_arq, modulo)
 end
 
 -- params: file, função
-local function  imprimir_prototipo(f, fn)
+local function imprimir_prototipo(f, fn, id)
    -- imrprime tipo de retorno
    if type(fn[3]) == "string" then
       f:write("   "..fn[3].." ")
    else
-      f:write("   "..params.id.."_tpCondRet ")
+      f:write("   "..id.."_tpCondRet ")
    end
 
    f:write(str_util.camel_case(fn[1]).."( ")
@@ -127,6 +127,32 @@ local function imprimir_desc_params(f, t, lin_size)
       desc = "-"..desc:sub(2,#desc)
       f:write(desc)
    end
+end
+
+-- Imprime o comentário de header de uma função
+local function imprimir_func_header(f, fn, id)
+-- fn = {'Nome da função', 'Descrição', Retornos, Parâmetros, Privada}
+   f:write("/***********************************************************************\n")
+   f:write("*\n")
+   f:write("*  $FC Função: "..id.." "..fn[1].."\n")
+   f:write("*\n")
+   f:write("*  $ED Descrição da função\n")
+   f:write(str_util.line_wrap_with_prefix(fn[2], 65, "*     "))
+   f:write("*\n")
+   f:write("*  $EP Parâmetros\n")
+   imprimir_desc_params(f, fn[4], 72)
+   f:write("*\n")
+   f:write("*  $FV Valor retornado\n")
+   if type(fn[3]) == 'table' then
+      for j,ret in ipairs(fn[3]) do
+         f:write("*     "..id.."_CondRet"..ret.."\n")
+      end
+   else
+      f:write("*     "..fn[3].." - \n")
+   end
+   f:write("*\n")
+   f:write("***********************************************************************/\n")
+   f:write("\n")
 end
 
 
@@ -172,28 +198,20 @@ local function criar_header()
    for i,fn in ipairs(params.funcoes) do
       -- fn = {'Nome da função', 'Descrição', Retornos, Parâmetros, Privada}
       if not fn[5] then -- não é privada
-         f:write("/***********************************************************************\n")
-         f:write("*\n")
-         f:write("*  $FC Função: "..id.." "..fn[1].."\n")
-         f:write("*\n")
-         f:write("*  $ED Descrição da função\n")
-         f:write(str_util.line_wrap_with_prefix(fn[2], 65, "*     "))
-         f:write("*\n")
-         f:write("*  $EP Parâmetros\n")
-         imprimir_desc_params(f, fn[4], 72)
-         f:write("*\n")
-         f:write("*  $FV Valor retornado\n")
-         for j,ret in ipairs(fn[3]) do
-            f:write("*     "..id.."_CondRet"..ret.."\n")
-         end
-         f:write("*\n")
-         f:write("***********************************************************************/\n")
-         f:write("\n")
-
-         imprimir_prototipo(f, fn)
+         imprimir_func_header(f, fn, id)
+         imprimir_prototipo(f, fn, id)
          f:write(" ;\n")
       end
    end
+
+   f:write("\n")
+   f:write("\n")
+   f:write("#undef "..define.."_\n")
+   f:write("\n")
+   f:write("/********** Fim do módulo de definição: Módulo "..params.nome.." **********/\n")
+   f:write("\n")
+   f:write("#else\n")
+   f:write("#endif\n")
 
    f:flush()
    f:close()
@@ -232,7 +250,7 @@ local function criar_code()
    local i,fn
    for i,fn in ipairs(func_p) do
       -- fn = {'Nome da função', 'Descrição', Retornos, Parâmetros, Privada}
-      imprimir_prototipo(f, fn)
+      imprimir_prototipo(f, fn, params.id)
       f:write(" ;\n")
       f:write("\n")
    end
@@ -240,8 +258,46 @@ local function criar_code()
    f:write("\n")
    f:write("/*****  Código das funções exportadas pelo módulo  *****/\n")
    f:write("\n")
+   f:write("\n")
+
+   for i,fn in ipairs(params.funcoes) do
+      -- fn = {'Nome da função', 'Descrição', Retornos, Parâmetros, Privada}
+      if fn[5] ~= true then
+         f:write("/***************************************************************************\n")
+         f:write("*\n")
+         f:write("*  Função: "..params.id.." "..fn[1].."\n")
+         f:write("*  ****/\n");
+         f:write("\n");
+         imprimir_prototipo(f, fn, params.id)
+         f:write("\n");
+         f:write("   {\n");
+         f:write("\n");
+         f:write("   } /* Fim função: "..params.id.." "..fn[1].." */\n");
+         f:write("\n");
+         f:write("\n");
+      end
+   end
+
+   f:write("/*****  Código das funções encapsuladas pelo módulo  *****/\n")
+   f:write("\n");
+   f:write("\n");
+
+   for i,fn in ipairs(func_p) do
+      -- fn = {'Nome da função', 'Descrição', Retornos, Parâmetros, Privada}
+      imprimir_func_header(f, fn, params.id)
+      imprimir_prototipo(f, fn, params.id)
+      f:write("\n");
+      f:write("   {\n");
+      f:write("\n");
+      f:write("   } /* Fim função: "..params.id.." "..fn[1].." */\n");
+      f:write("\n");
+      f:write("\n");
+   end
 
 
+
+   f:write("/********** Fim do módulo de implementação: Módulo "..params.nome.." **********/\n")
+   f:write("\n")
    f:flush()
    f:close()
 end
