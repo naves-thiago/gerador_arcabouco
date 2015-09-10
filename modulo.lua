@@ -67,7 +67,7 @@ local function imprimir_cabecalho(f, nome_arq, modulo)
    f:write("*\n")
    f:write("*  Projeto: Disciplina INF 1301\n")
    f:write("*  Autores:\n")
-   f:write("*           \n")
+   f:write("*\n")
    f:write("*\n")
    f:write("*  $HA Histórico de evolução:\n")
    f:write("*     Versão  Autor    Data     Observações\n")
@@ -82,21 +82,21 @@ end
 -- params: file, função
 local function imprimir_prototipo(f, fn, id)
    -- imrprime tipo de retorno
-   if type(fn[3]) == "string" then
-      f:write("   "..fn[3].." ")
+   if type(fn.retornos) == "string" then
+      f:write("   "..fn.retornos.." ")
    else
       f:write("   "..id.."_tpCondRet ")
    end
 
-   f:write(str_util.camel_case(fn[1]).."( ")
-   if (not fn[4]) or (#fn[4] == 0) then
+   f:write(str_util.camel_case(fn.nome).."( ")
+   if (not fn.parametros) or (#fn.parametros == 0) then
       f:write("void )") -- nenhum parâmetro
    else
       -- Primeiro parâmetro sem vírgula antes
-      f:write(fn[4][1][2].." "..fn[4][1][1])
-      for p = 2,#fn[4] do
-         -- fn[4][p] = {"Nome", "tipo", "descrição"}
-         f:write(" , "..fn[4][p][2].." "..fn[4][p][1])
+      f:write(fn.parametros[1][2].." "..fn.parametros[1][1])
+      for p = 2,#fn.parametros do
+         -- fn.parametros[p] = {"Nome", "tipo", "descrição"}
+         f:write(" , "..fn.parametros[p][2].." "..fn.parametros[p][1])
       end
       f:write(" )")
    end
@@ -134,21 +134,21 @@ local function imprimir_func_header(f, fn, id)
 -- fn = {'Nome da função', 'Descrição', Retornos, Parâmetros, Privada}
    f:write("/***********************************************************************\n")
    f:write("*\n")
-   f:write("*  $FC Função: "..id.." "..fn[1].."\n")
+   f:write("*  $FC Função: "..id.." "..fn.nome.."\n")
    f:write("*\n")
    f:write("*  $ED Descrição da função\n")
-   f:write(str_util.line_wrap_with_prefix(fn[2], 65, "*     "))
+   f:write(str_util.line_wrap_with_prefix(fn.descricao, 65, "*     "))
    f:write("*\n")
    f:write("*  $EP Parâmetros\n")
-   imprimir_desc_params(f, fn[4], 72)
+   imprimir_desc_params(f, fn.parametros, 72)
    f:write("*\n")
    f:write("*  $FV Valor retornado\n")
-   if type(fn[3]) == 'table' then
-      for j,ret in ipairs(fn[3]) do
+   if type(fn.retornos) == 'table' then
+      for j,ret in ipairs(fn.retornos) do
          f:write("*     "..id.."_CondRet"..ret.."\n")
       end
    else
-      f:write("*     "..fn[3].." - \n")
+      f:write("*     "..fn.retornos.." - \n")
    end
    f:write("*\n")
    f:write("***********************************************************************/\n")
@@ -197,7 +197,7 @@ local function criar_header()
    local i, fn
    for i,fn in ipairs(params.funcoes) do
       -- fn = {'Nome da função', 'Descrição', Retornos, Parâmetros, Privada}
-      if not fn[5] then -- não é privada
+      if not fn.privada then -- não é privada
          imprimir_func_header(f, fn, id)
          imprimir_prototipo(f, fn, id)
          f:write(" ;\n")
@@ -222,7 +222,7 @@ local function funcoes_privadas()
    local t = {}
    local i,fn
    for i,fn in ipairs(params.funcoes) do
-      if fn[5] == true then
+      if fn.privada == true then
          table.insert(t, fn)
       end
    end
@@ -262,17 +262,17 @@ local function criar_code()
 
    for i,fn in ipairs(params.funcoes) do
       -- fn = {'Nome da função', 'Descrição', Retornos, Parâmetros, Privada}
-      if fn[5] ~= true then
+      if fn.privada ~= true then
          f:write("/***************************************************************************\n")
          f:write("*\n")
-         f:write("*  Função: "..params.id.." "..fn[1].."\n")
+         f:write("*  Função: "..params.id.." "..fn.nome.."\n")
          f:write("*  ****/\n");
          f:write("\n");
          imprimir_prototipo(f, fn, params.id)
          f:write("\n");
          f:write("   {\n");
          f:write("\n");
-         f:write("   } /* Fim função: "..params.id.." "..fn[1].." */\n");
+         f:write("   } /* Fim função: "..params.id.." "..fn.nome.." */\n");
          f:write("\n");
          f:write("\n");
       end
@@ -289,7 +289,7 @@ local function criar_code()
       f:write("\n");
       f:write("   {\n");
       f:write("\n");
-      f:write("   } /* Fim função: "..params.id.." "..fn[1].." */\n");
+      f:write("   } /* Fim função: "..params.id.." "..fn.nome.." */\n");
       f:write("\n");
       f:write("\n");
    end
@@ -302,11 +302,46 @@ local function criar_code()
    f:close()
 end
 
+local function criar_test()
+   local f = f_test
+   local id = "T"..params.id
+
+   f:write("/***************************************************************************\n")
+   f:write("*  $MCI Módulo de implementação: Módulo de teste específico\n")
+   f:write("*\n")
+   f:write("*  Arquivo gerado:              "..params.arq_test.."\n")
+   f:write("*  Letras identificadoras:      T"..id.."\n")
+   f:write("*\n")
+   f:write("*  Projeto: Disciplina INF 1301\n")
+   f:write("*  Autores:\n")
+   f:write("*\n")
+   f:write("*\n")
+   f:write("*  $HA Histórico de evolução:")
+   f:write("*       1.00   ???   "..os.date("%d/%m/%Y").." Início do desenvolvimento\n")
+   f:write("*\n")
+   f:write("*  $ED Descrição do módulo\n")
+   f:write("*     Este módulo contém as funções específicas para o teste do\n")
+   f:write("*     módulo "..params.nome..".\n")
+   f:write("*\n")
+   f:write("*  $EIU Interface com o usuário pessoa\n")
+   f:write("*     Comandos de teste específicos para testar o módulo "..params.nome..":\n")
+   f:write("*\n")
+
+   local i,fn
+   for i,fn in ipairs(params.funcoes) do
+      if not fn.privada then
+         f:write("*     =""criar <int>  - chama a função MAT_CriarMatriz( mat )\n")
+--         f:write("*     =criar <int>  - chama a função MAT_CriarMatriz( mat )\n")
+         f:write("*\n")
+      end
+   end
+end
 
 -- Parâmetros:
 -- nome: Nome do módulo
 -- id: Nome abreviado / prefixo / namespace do módulo
 -- testes: Se true, também será gerado um arquivo de teste (.c) e um script (.script) para o arcabouço
+-- mult_instan: Se true, serão utilizadas múltiplas instâncias desse módulo nos testes
 -- cond_ret: Lista de condições de retorno para o arcabouço que serão usadas nesse módulo
 --          Cada elemento dessa tabela deve ser uma tabela no formato {'Nome da condição', 'Descrição'}
 -- funcoes: Lista de funções do módulo
@@ -323,12 +358,13 @@ end
 -- arq_head: Nome do arquivo .h do módulo.
 -- arq_test: Nome do arquivo .c de teste.
 -- arq_script: Nome do arquivo de script de teste.
-function criar_modulo(nome, id, testes, cond_ret, funcoes, arq_code, arq_head, arq_test, arq_script)
+function criar_modulo(nome, id, testes, mult_instan, cond_ret, funcoes, arq_code, arq_head, arq_test, arq_script)
    params.nome = nome
    params.id = string.upper(id)
    params.cond_ret = cond_ret
    params.funcoes = funcoes
    params.testes = testes
+   params.mult_instan = mult_instan
    params.arq_code = arq_code
    params.arq_head = arq_head
    params.arq_test = arq_test
@@ -336,6 +372,29 @@ function criar_modulo(nome, id, testes, cond_ret, funcoes, arq_code, arq_head, a
 
    if not abrir_arquivos() then
       return
+   end
+
+   local i,fn
+   for i,fn in ipairs(funcoes) do
+      if not fn.nome then
+         fn.nome = fn[1]
+      end
+
+      if not fn.descricao then
+         fn.descricao = fn[2]
+      end
+
+      if not fn.retornos then
+         fn.retornos = fn[3]
+      end
+
+      if not fn.parametros then
+         fn.parametros = fn[4]
+      end
+
+      if not fn.privada then
+         fn.privada = fn[5]
+      end
    end
 
    criar_header()
