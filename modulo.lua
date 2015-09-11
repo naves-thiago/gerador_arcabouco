@@ -34,7 +34,7 @@ local function abrir_arquivos()
       return false
    end
 
-   if (arq_test) then
+   if (params.arq_test) then
       f_test = io.open(params.arq_test, "w")
       if (f_test == nil) then
          f_code:close()
@@ -43,7 +43,8 @@ local function abrir_arquivos()
       end
    end
 
-   if (arq_script) then
+   --[[
+   if (params.arq_script) then
       f_script = io.open(params.arq_script, "w")
       if (f_script == nil) then
          f_code:close()
@@ -52,6 +53,7 @@ local function abrir_arquivos()
          return false
       end
    end
+--]]
 
    return true
 end
@@ -302,9 +304,46 @@ local function criar_code()
    f:close()
 end
 
+-- converte um tipo de C para uma string formatada
+local function tipo_to_string(tipo)
+   local ret = tipo:gsub(" ","")
+   if ret == "char*" then
+      ret = "string"
+   end
+   return ret
+end
+
+-- Params: função
+-- Retorno: string com todos os tipos dos parâmetros
+local function params_teste_to_string(fn)
+   local fparams = fn.parametros or {}
+   local ret = "<"
+
+   if params.mult_instan then
+      if #fparams > 0 then
+         ret = "<int, "
+      else
+         ret = "<int"
+      end
+   end
+
+   if #fparams > 0 then
+      ret = ret .. tipo_to_string(fparams[1][2])
+   end
+
+   local p
+   for p = 2,#fparams do
+      ret = ret .. ", "..tipo_to_string(fparams[p][2])
+   end
+
+   ret = ret .. ">"
+   return ret
+end
+
 local function criar_test()
    local f = f_test
    local id = "T"..params.id
+   local limite = 75
 
    f:write("/***************************************************************************\n")
    f:write("*  $MCI Módulo de implementação: Módulo de teste específico\n")
@@ -316,8 +355,9 @@ local function criar_test()
    f:write("*  Autores:\n")
    f:write("*\n")
    f:write("*\n")
-   f:write("*  $HA Histórico de evolução:")
-   f:write("*       1.00   ???   "..os.date("%d/%m/%Y").." Início do desenvolvimento\n")
+   f:write("*  $HA Histórico de evolução:\n")
+   f:write("*     Versão  Autor    Data     Observações\n")
+   f:write("*       1.00  ???    "..os.date("%d/%m/%Y").." Início do desenvolvimento\n")
    f:write("*\n")
    f:write("*  $ED Descrição do módulo\n")
    f:write("*     Este módulo contém as funções específicas para o teste do\n")
@@ -330,11 +370,84 @@ local function criar_test()
    local i,fn
    for i,fn in ipairs(params.funcoes) do
       if not fn.privada then
-         f:write("*     =""criar <int>  - chama a função MAT_CriarMatriz( mat )\n")
---         f:write("*     =criar <int>  - chama a função MAT_CriarMatriz( mat )\n")
+         -- Descrição da função
+         local linha = "*     ="..fn.nome_teste.." "..params_teste_to_string(fn)
+         f:write(linha)
+         f:write(" - chama a função "..params.id.."_"..str_util.camel_case(fn.nome).."( )\n")
+
+         -- Imprime os parâmetros
+         local prefixo = "*         "
+         f:write(prefixo.."Parâmetros:\n")
+
+         if params.mult_instan then
+            f:write(prefixo.."1 - Instância: Instância do módulo a ser testada\n")
+         end
+
+         for i,p in ipairs(fn.parametros) do
+            if (params.mult_instan) then
+               linha = tostring(i+1)
+            else
+               linha = tostring(i)
+            end
+
+            linha = linha.." - "..p[1]..": "
+            f:write(prefixo..linha)
+
+            local desc -- descrição
+            desc = str_util.line_wrap_with_prefix(p[3], limite - #linha - #prefixo,
+                                                  prefixo..string.rep(" ", #linha))
+            desc = desc:sub(#linha + #prefixo + 1, #desc)
+            f:write(desc)
+         end
+
          f:write("*\n")
       end
    end
+
+   f:write("***************************************************************************/\n")
+   f:write("\n")
+   f:write("#include <stdio.h>\n")
+   f:write("#include <stdlib.h>\n")
+   f:write("#include <string.h>\n")
+   f:write("#include <assert.h>\n")
+   f:write("#include \"tst_espc.h\"\n")
+   f:write("#include \"generico.h\"\n")
+   f:write("#include \"lerparam.h\"\n")
+   f:write("#include \""..params.arq_head.."\"\n")
+   f:write("\n")
+   f:write("/* Tabela os nomes dos comandos de teste específicos */\n")
+   f:write("\n")
+
+   local maior = 0
+   local const
+   -- encontra o maior nome e gera os símbolos
+   for i,fn in ipairs(params.funcoes) do
+      if not fn.privada then
+         const = str_util.remove_acentos(fn.nome)
+         const = const:gsub(" ", "_")
+         const = "CMD_"..string.upper(const)
+         fn.nome_const = const
+
+         if maior < #const then
+            maior = #const
+         end
+      end
+   end
+
+   -- imprime as constantes
+   for i,fn in ipairs(params.funcoes) do
+      if not fn.privada then
+         f:write("const char "..fn.nome_const..string.rep(" ", maior - #fn.nome_const).." [] = \"=")
+         f:write(fn.nome_teste.."\" ;\n")
+      end
+   end
+
+   f:write("\n")
+   f:write("\n")
+
+
+   f:flush()
+   f:close()
 end
 
 -- Parâmetros:
@@ -352,8 +465,9 @@ end
 --            de retorno, em vez de tpCondRet.
 --          - Parâmetros é uma lista contendo os parâmetros da função. Cada elemento dessa lista deve ser
 --            uma tabela no formato {'Nome', 'Tipo', 'Descrição'}
---          - Privada: Se true, a função é declarada como static, o namespace é omitido, o protótipo é
---            colocado no início do .c e a função é omitida do .h e dos testes.
+--          - Nome Teste: String que será o nome usado no script de teste para chamar essa função.
+--                        Se nil, a função é declarada como static, o namespace é omitido, o protótipo é
+--                        colocado no início do .c e a função é omitida do .h e dos testes.
 -- arq_code: Nome do arquivo .c do módulo.
 -- arq_head: Nome do arquivo .h do módulo.
 -- arq_test: Nome do arquivo .c de teste.
@@ -393,12 +507,19 @@ function criar_modulo(nome, id, testes, mult_instan, cond_ret, funcoes, arq_code
       end
 
       if not fn.privada then
-         fn.privada = fn[5]
+         if not fn[5] then
+            fn.privada = true
+         end
+      end
+
+      if not fn.nome_teste then
+         fn.nome_teste = fn[5]
       end
    end
 
    criar_header()
    criar_code()
+   criar_test()
 end
 
 
