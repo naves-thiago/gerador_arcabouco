@@ -142,9 +142,11 @@ local function imprimir_func_header(f, fn, id)
    f:write("*  $ED Descrição da função\n")
    f:write(str_util.line_wrap_with_prefix(fn.descricao, 65, "*     "))
    f:write("*\n")
-   f:write("*  $EP Parâmetros\n")
-   imprimir_desc_params(f, fn.parametros, 72)
-   f:write("*\n")
+   if fn.parametros and #fn.parametros > 0 then
+      f:write("*  $EP Parâmetros\n")
+      imprimir_desc_params(f, fn.parametros, 72)
+      f:write("*\n")
+   end
    f:write("*  $FV Valor retornado\n")
    if type(fn.retornos) == 'table' then
       for j,ret in ipairs(fn.retornos) do
