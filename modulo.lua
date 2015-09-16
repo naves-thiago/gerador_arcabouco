@@ -307,18 +307,33 @@ end
 
 -- converte um tipo de C para uma string formatada
 local function tipo_to_string(tipo)
-   local ret = tipo:gsub(" ","")
-   if ret == "char*" then
-      ret = "string"
+   local ret = string.lower(tipo:gsub(" ",""))
+   local conv = {}
+
+   conv["char"]    = "char"
+   conv["char*"]   = "string"
+   conv["default"] = "int"
+
+   if conv[ret] then
+      return conv[ret]
+   else
+      return conv["default"]
    end
-   return ret
 end
 
 -- Params: função
 -- Retorno: string com todos os tipos dos parâmetros
 local function params_teste_to_string(fn)
-   local fparams = fn.parametros or {}
+   local fparams = {}
    local ret = "<"
+
+   if fn.parametros then
+      for i,p in ipairs(fn.parametros) do
+         if not p[4] then -- não é oculto do teste
+            table.insert(fparams, p)
+         end
+      end
+   end
 
    if params.mult_instan then
       if #fparams > 0 then
@@ -337,7 +352,13 @@ local function params_teste_to_string(fn)
       ret = ret .. ", "..tipo_to_string(fparams[p][2])
    end
 
+   -- Caso não tenha nenhum parâmetro, não retornar "<>"
+   if ret == "<" then
+      return nil
+   end
+
    ret = ret .. ">"
+
    return ret
 end
 
@@ -364,7 +385,7 @@ local function criar_test()
    f:write("*     Este módulo contém as funções específicas para o teste do\n")
    f:write("*     módulo "..params.nome..".\n")
    f:write("*\n")
-   f:write("*  $EIU Interface com o usuário pessoa\n")
+   f:write("*  $EIU Interface com o usuário\n")
    f:write("*     Comandos de teste específicos para testar o módulo "..params.nome..":\n")
    f:write("*\n")
 
@@ -372,33 +393,42 @@ local function criar_test()
    for i,fn in ipairs(params.funcoes) do
       if not fn.privada then
          -- Descrição da função
-         local linha = "*     ="..fn.nome_teste.." "..params_teste_to_string(fn)
+         local linha = "*     ="..fn.nome_teste
+         local str_params = params_teste_to_string(fn)
+         if str_params then
+            linha = linha.." "..str_params
+         end
+
          f:write(linha)
          f:write(" - chama a função "..params.id.."_"..str_util.camel_case(fn.nome).."( )\n")
 
          -- Imprime os parâmetros
          local prefixo = "*         "
-         f:write(prefixo.."Parâmetros:\n")
-
-         if params.mult_instan then
-            f:write(prefixo.."1 - Instância: Instância do módulo a ser testada\n")
+         if str_params then
+            f:write(prefixo.."Parâmetros:\n")
          end
 
+         local id = 1
+         if params.mult_instan then
+            f:write(prefixo.."1 - Instância: Instância do módulo a ser testada\n")
+            id = 2
+         end
+
+         -- Lista os parâmetros
          for i,p in ipairs(fn.parametros) do
-            if (params.mult_instan) then
-               linha = tostring(i+1)
-            else
-               linha = tostring(i)
+            if not p[4] then
+               linha = tostring(id)
+
+               linha = linha.." - "..p[1]..": "
+               f:write(prefixo..linha)
+
+               local desc -- descrição
+               desc = str_util.line_wrap_with_prefix(p[3], limite - #linha - #prefixo,
+               prefixo..string.rep(" ", #linha))
+               desc = desc:sub(#linha + #prefixo + 1, #desc)
+               f:write(desc)
+               id = id + 1
             end
-
-            linha = linha.." - "..p[1]..": "
-            f:write(prefixo..linha)
-
-            local desc -- descrição
-            desc = str_util.line_wrap_with_prefix(p[3], limite - #linha - #prefixo,
-                                                  prefixo..string.rep(" ", #linha))
-            desc = desc:sub(#linha + #prefixo + 1, #desc)
-            f:write(desc)
          end
 
          f:write("*\n")
