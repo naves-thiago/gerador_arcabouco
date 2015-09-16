@@ -122,11 +122,13 @@ local function imprimir_desc_params(f, t, lin_size)
    end
 
    local wrap = lin_size - max_len - 11
-
+   print(wrap)
    for i,j in ipairs(t) do
-      f:write("*     $P "..j[1]..string.rep(" ", max_len - #(j[1]) + 1))
-      local desc = str_util.line_wrap_with_prefix(j[3], wrap, "  ")
-      desc = "-"..desc:sub(2,#desc)
+      local linha = "*     $P "..j[1]..string.rep(" ", max_len - #(j[1]) + 1)
+      f:write(linha)
+
+      local desc = str_util.line_wrap_with_prefix(j[3], wrap, "* "..string.rep(" ", #linha))
+      desc = "-"..desc:sub(#linha + 2,#desc)
       f:write(desc)
    end
 end
@@ -203,10 +205,10 @@ local function criar_header()
          imprimir_func_header(f, fn, id)
          imprimir_prototipo(f, fn, id)
          f:write(" ;\n")
+         f:write("\n")
       end
    end
 
-   f:write("\n")
    f:write("\n")
    f:write("#undef "..define.."_\n")
    f:write("\n")

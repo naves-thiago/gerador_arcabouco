@@ -19,14 +19,15 @@ function line_wrap(s, n)
    local br = 0 -- line break
    local lines = {}
    local b = false --break
+   local wrap = false -- force wrap on a \n
 
+   br = s:find("\n")
    while p ~= nil do
       f = s:find(" ", p + 1)
       if br ~= nil then
          if br < p then
             br = p
          end
-         br = s:find("\n", br + 1)
       end
 
       if f == nil then
@@ -36,15 +37,25 @@ function line_wrap(s, n)
             f = #s
             b = true
          end
-      else 
-         if br and f > br then
+      else
+         if br and (f > br) then
             f = br
+            br = s:find("\n", br + 1)
+            wrap = true
          end
       end
 
-      if (l + f - p) <= n then
+      if ((l + f - p) <= n) and (not wrap) then
          l = l + f - p -- still fits in the line
       else
+         if p == 0 then
+            p = f
+            l = f-1
+         end
+         if wrap then
+            l = l + f - p
+         end
+         wrap = false
          if p > 0 then
             if s:sub(p-l, p-l) == " " or
                s:sub(p-l, p-l) == "\n" then
