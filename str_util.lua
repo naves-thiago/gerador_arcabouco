@@ -45,40 +45,49 @@ function line_wrap(s, n)
          end
       end
 
-      if ((l + f - p) <= n) and (not wrap) then
-         l = l + f - p -- still fits in the line
-      else
+      if wrap then
          if p == 0 then
-            p = f
-            l = f-1
-         end
-         if wrap then
-            l = l + f - p
+            table.insert(lines, s:sub(1, f-1))
+         else
+            if s:sub(p-l, p-l) == " " or
+               s:sub(p-l, p-l) == "\n" then
+               p = p +1
+            end
+            table.insert(lines, s:sub(p-l, f-1))
          end
          wrap = false
-         if p > 0 then
+         p = f
+         l = 0
+      else
+         if (l + f - p) <= n then
+            l = l + f - p -- still fits in the line
+         else
+            if p == 0 then
+               p = f
+               l = f-1
+            end
             if s:sub(p-l, p-l) == " " or
                s:sub(p-l, p-l) == "\n" then
                table.insert(lines, s:sub(p-l+1, p-1))
             else
                table.insert(lines, s:sub(p-l, p-1))
             end
+            l = f-p
          end
-         l = f-p
-      end
 
-      p = f
-      if b then
-         if l > 0 then
-            p = p + 1
-            if s:sub(p-l, p-l) == " " or
-               s:sub(p-l, p-l) == "\n" then
-               table.insert(lines, s:sub(p-l+1, f))
-            else
-               table.insert(lines, s:sub(p-l, f))
+         p = f
+         if b then
+            if l > 0 then
+               p = p + 1
+               if s:sub(p-l, p-l) == " " or
+                  s:sub(p-l, p-l) == "\n" then
+                  table.insert(lines, s:sub(p-l+1, f))
+               else
+                  table.insert(lines, s:sub(p-l, f))
+               end
             end
+            break
          end
-         break
       end
    end
 
