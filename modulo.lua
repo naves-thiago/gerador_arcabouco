@@ -122,7 +122,6 @@ local function imprimir_desc_params(f, t, lin_size)
    end
 
    local wrap = lin_size - max_len - 11
-   print(wrap)
    for i,j in ipairs(t) do
       local linha = "*     $P "..j[1]..string.rep(" ", max_len - #(j[1]) + 1)
       f:write(linha)
