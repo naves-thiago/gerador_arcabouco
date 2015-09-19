@@ -58,8 +58,34 @@ local function abrir_arquivos()
    return true
 end
 
+-- Cria uma string com as iniciais do autor
+-- params: nome do autor
+function iniciais_autor(nome)
+   assert(type(nome) == "string")
+   local ret = nome:sub(1,1)
+   local p = nome:find(" ")
+
+   while p and p < #nome do
+      ret = ret .. nome:sub(p+1, p+1)
+      p = nome:find(" ", p+1)
+   end
+
+   return string.lower(ret)
+end
+
 -- params: file, nome do arquivo, nome do modulo
 local function imprimir_cabecalho(f, nome_arq, modulo)
+   local autores = params.autores or {}
+   local aut = "???"
+
+   if autores[1] then
+      aut = iniciais_autor(autores[1])
+      local i
+      for i=2, #autores do
+         aut = aut .. ", " .. iniciais_autor(autores[i])
+      end
+   end
+
    f:write("/**********************************************************************\n")
    f:write("*\n")
    f:write("*  $MCD Módulo de definição: Módulo "..modulo.."\n")
@@ -68,12 +94,29 @@ local function imprimir_cabecalho(f, nome_arq, modulo)
    f:write("*  Letras identificadoras:      "..params.id.."\n")
    f:write("*\n")
    f:write("*  Projeto: Disciplina INF 1301\n")
-   f:write("*  Autores:\n")
-   f:write("*\n")
+   if #autores == 0 then
+      f:write("*  Autores:\n")
+   else
+      if #autores == 1 then
+         f:write("*  Autor: " .. iniciais_autor(autores[1]) .. " - " .. autores[1] .. "\n")
+      else
+         f:write("*  Autores: " .. iniciais_autor(autores[1]) .. " - " .. autores[1] .. "\n")
+      end
+   end
+
+   local i
+   for i=2, #autores do
+      f:write("*           " .. iniciais_autor(autores[i]) .. " - " .. autores[i] .. "\n")
+   end
+
    f:write("*\n")
    f:write("*  $HA Histórico de evolução:\n")
-   f:write("*     Versão  Autor    Data     Observações\n")
-   f:write("*       1.00   ???   "..os.date("%d/%m/%Y").." Início do desenvolvimento\n")
+   if #aut <= 5 then
+      f:write("*     Versão  Autor    Data     Observações\n")
+   else
+      f:write("*     Versão  Autor"..string.rep(" ", #aut -4).."    Data     Observações\n")
+   end
+   f:write("*       1.00  "..aut.."   "..os.date("%d/%m/%Y").." Início do desenvolvimento\n")
    f:write("*\n")
    f:write("*  $ED Descrição do módulo\n")
    f:write("*     Descrição...\n")
@@ -501,17 +544,19 @@ end
 --          - Nome Teste: String que será o nome usado no script de teste para chamar essa função.
 --                        Se nil, a função é declarada como static, o namespace é omitido, o protótipo é
 --                        colocado no início do .c e a função é omitida do .h e dos testes.
+-- autores: Lista com o(s) nome(s) do(s) autor(es)
 -- arq_code: Nome do arquivo .c do módulo.
 -- arq_head: Nome do arquivo .h do módulo.
 -- arq_test: Nome do arquivo .c de teste.
 -- arq_script: Nome do arquivo de script de teste.
-function criar_modulo(nome, id, testes, mult_instan, cond_ret, funcoes, arq_code, arq_head, arq_test, arq_script)
+function criar_modulo(nome, id, testes, mult_instan, cond_ret, funcoes, autores, arq_code, arq_head, arq_test, arq_script)
    params.nome = nome
    params.id = string.upper(id)
    params.cond_ret = cond_ret
    params.funcoes = funcoes
    params.testes = testes
    params.mult_instan = mult_instan
+   params.autores = autores
    params.arq_code = arq_code
    params.arq_head = arq_head
    params.arq_test = arq_test
