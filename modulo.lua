@@ -133,7 +133,12 @@ local function imprimir_prototipo(f, fn, id)
       f:write("   "..id.."_tpCondRet ")
    end
 
-   f:write(str_util.camel_case(fn.nome).."( ")
+   if fn.privada then
+      f:write(str_util.camel_case(fn.nome).."( ")
+   else
+      f:write(id.."_"..str_util.camel_case(fn.nome).."( ")
+   end
+
    if (not fn.parametros) or (#fn.parametros == 0) then
       f:write("void )") -- nenhum parâmetro
    else
@@ -253,8 +258,6 @@ local function criar_header()
       end
    end
 
-   f:write("\n")
-   f:write("#undef "..define.."_\n")
    f:write("\n")
    f:write("/********** Fim do módulo de definição: Módulo "..params.nome.." **********/\n")
    f:write("\n")
