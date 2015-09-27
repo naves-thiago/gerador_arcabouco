@@ -153,4 +153,48 @@ function camel_case(s)
    return s
 end
 
+-- Cria uma cópia do vetor adicionando espaços à direita para igualar os tamanhos
+-- O vetor v será iterado com ipairs()
+-- Se o parâmetro index for utilizado, serão considerados os elementos v[i][index]
+-- em vez de v[i], para o caso de v ser um vetor de tabelas
+function right_padding_i(v, index)
+   if not v then
+      return nil
+   end
+
+   local out = {}
+   local max = 0
+   local i, s
+   for i, s in ipairs(v) do
+      if index then
+         if max < #(s[index]) then
+            max = #(s[index])
+         end
+      else
+         if max < #s then
+            max = #s
+         end
+      end
+   end
+
+   for i, s in ipairs(v) do
+      if index then
+         local k,v
+         -- Copy table values and create the string at index
+         out[i] = {}
+         for k, v in pairs(s) do
+            if k ~= index then
+               out[i][k] = v
+            else
+               out[i][k] = v..string.rep(" ", max - #v)
+            end
+         end
+      else -- Not a table, just create the new string
+         out[i] = s..string.rep(" ", max - #s)
+      end
+   end
+
+   return out
+end
+
 return mod
