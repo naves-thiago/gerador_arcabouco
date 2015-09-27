@@ -6,6 +6,7 @@ local os = os
 local string = string
 local print = print
 local ipairs = ipairs
+local pairs = pairs
 local tostring = tostring
 local assert = assert
 local type = type
@@ -214,7 +215,7 @@ local function criar_header()
    local f = f_header
    local id = params.id
    local nome = str_util.remove_acentos(params.nome)
-   local define = string.upper(nome:gsub(" ","_"))
+   local define = string.upper(string.gsub(nome, " ","_"))
 
    f:write("#if ! defined( "..define.."_ )\n")
    f:write("#define "..define.."_\n")
@@ -355,7 +356,7 @@ end
 
 -- converte um tipo de C para uma string formatada
 local function tipo_to_string(tipo)
-   local ret = string.lower(tipo:gsub(" ",""))
+   local ret = string.lower(string.gsub(tipo," ",""))
    local conv = {}
 
    conv["char"]    = "char"
@@ -410,10 +411,125 @@ local function params_teste_to_string(fn)
    return ret
 end
 
+local tipos_params
+local function lista_tipos()
+   -- global tipos_params guarda a lista de tipos para evitar recriar a lista
+   if not tipos_params then
+      local tipos = {} -- lista de tipos convertidos no formato 'tipo' = true
+
+      local i,f,j,p
+      for i,f in pairs(params.funcoes) do
+         if not f.privada then
+            for j,p in pairs(f.parametros) do
+               tipos[ tipo_to_string(p[2]) ] = true
+            end
+         end
+      end
+
+      tipos["int"] = true -- Sempre deve ter o int para a condição de retorno
+
+      tipos_params = {}
+      for i,j in pairs(tipos) do
+         table.insert(tipos_params, i)
+      end
+   end
+
+   return tipos_params
+end
+
+-- Params: f - arquivo
+local function imprimir_macros_typecast(f)
+   -- TODO tratar o caso do tipo string
+   local i, t
+   local tipos = lista_tipos()
+   for i, t in ipairs(tipos) do
+      f:write("#define PARAM_"..string.upper(t).."( p ) ( *( "..t.." * ) &Parametros[ p ] )\n")
+   end
+end
+
+-- Params: f - arquivo
+local function imprimir_vetor_comandos(f)
+   -- TODO tratar o caso do tipo string?
+   f:write("static tpComandoTeste Comandos[] = {\n")
+   f:write("/*   Comando             Parâmetros  Função               Mensagem de erro */\n")
+
+   local cc = {} -- camel case
+   local sc = {} -- snake case
+   local p = {}
+   local i,j,fn,tp
+   for i, fn in ipairs(params.funcoes) do
+      cc[i] = str_util.camel_case(fn.nome) .. " ,"
+      sc[i] = string.gsub(str_util.remove_acentos(fn.nome), " ", "_") .. " ,"
+   end
+
+   cc = str_util.right_padding_i(cc)
+   sc = str_util.right_padding_i(sc)
+
+   for i, fn in ipairs(params.funcoes) do
+      p[i] = '"'
+      for j, tp in ipairs(fn.parametros) do
+         p[i] = p[i] .. tipo_to_string(tp[2]):sub(1,1)
+      end
+      p[i] = p[i] .. 'i"'
+   end
+
+   p = str_util.right_padding_i(p)
+
+   for i, fn in ipairs(params.funcoes) do
+      if i ~= #params.funcoes then
+         f:write("   { CMD_"..string.upper(sc[i]).." "..p[i].." , TMAT_"..cc[i]..' "Retorno errado ao " } ,\n')
+      else
+         f:write("   { CMD_"..string.upper(sc[i]).." "..p[i].." , TMAT_"..cc[i]..' "Retorno errado ao " }\n')
+      end
+   end
+
+   f:write("} ;\n")
+end
+
+local function obter_max_params()
+   local i, fn
+   local max = 0
+   for i, fn in ipairs(params.funcoes) do
+      if #fn.parametros > max then
+         max = #fn.parametros
+      end
+   end
+
+   return max
+end
+
+-- Params: f - arquivo
+local function imprimir_union_tipos(f)
+   -- TODO tratar o caso do tipo string
+   local i, t
+   local tipos = lista_tipos()
+
+   f:write("typedef union\n")
+   f:write("{\n")
+
+   for t=1, #tipos -1 do
+      f:write("   "..tipos[t].." "..tipos[t]:sub(1,1).." ,\n")
+   end
+   f:write("   "..tipos[#tipos].." "..tipos[#tipos]:sub(1,1).."\n")
+   f:write("} tpParam ;\n")
+end
+
 local function criar_test()
+   local autores = params.autores or {}
+   local aut = "???"
+
+   if autores[1] then
+      aut = iniciais_autor(autores[1])
+      local i
+      for i=2, #autores do
+         aut = aut .. ", " .. iniciais_autor(autores[i])
+      end
+   end
+
    local f = f_test
    local id = "T"..params.id
    local limite = 75
+   local tipos = lista_tipos()
 
    f:write("/***************************************************************************\n")
    f:write("*  $MCI Módulo de implementação: Módulo de teste específico\n")
@@ -422,12 +538,29 @@ local function criar_test()
    f:write("*  Letras identificadoras:      "..id.."\n")
    f:write("*\n")
    f:write("*  Projeto: Disciplina INF 1301\n")
-   f:write("*  Autores:\n")
-   f:write("*\n")
+   if #autores == 0 then
+      f:write("*  Autores:\n")
+   else
+      if #autores == 1 then
+         f:write("*  Autor: " .. iniciais_autor(autores[1]) .. " - " .. autores[1] .. "\n")
+      else
+         f:write("*  Autores: " .. iniciais_autor(autores[1]) .. " - " .. autores[1] .. "\n")
+      end
+   end
+
+   local i
+   for i=2, #autores do
+      f:write("*           " .. iniciais_autor(autores[i]) .. " - " .. autores[i] .. "\n")
+   end
+
    f:write("*\n")
    f:write("*  $HA Histórico de evolução:\n")
-   f:write("*     Versão  Autor    Data     Observações\n")
-   f:write("*       1.00  ???    "..os.date("%d/%m/%Y").." Início do desenvolvimento\n")
+   if #aut <= 5 then
+      f:write("*     Versão  Autor    Data     Observações\n")
+   else
+      f:write("*     Versão  Autor"..string.rep(" ", #aut -4).."    Data     Observações\n")
+   end
+   f:write("*       1.00  "..aut.."   "..os.date("%d/%m/%Y").." Início do desenvolvimento\n")
    f:write("*\n")
    f:write("*  $ED Descrição do módulo\n")
    f:write("*     Este módulo contém as funções específicas para o teste do\n")
@@ -524,6 +657,131 @@ local function criar_test()
    f:write("\n")
    f:write("\n")
 
+   if params.mult_instan then
+      f:write("/* Quantidade máxima de instâncias do módulo que podem ser testadas simultaneamente */\n")
+      f:write("#define QTD_INSTANCIAS 10\n")
+      f:write("\n")
+   end
+
+   f:write("/* Quantidade máxima de parâmetros permitidos em um comando de teste,\n")
+   f:write(" * mais 1 para o retorno esperado */\n")
+   f:write("#define MAX_PARAMS "..(obter_max_params()+1).."\n")
+   f:write("\n")
+
+   if #tipos > 1 then
+      f:write("/* Macros de typecast dos parâmetros */\n")
+      imprimir_macros_typecast(f)
+      f:write("\n")
+   end
+
+   f:write("/***** Tipos de dados utilizados neste módulo de teste *****/\n")
+   f:write("\n")
+   f:write("\n")
+
+   if #tipos > 1 then
+      f:write("/***********************************************************************\n")
+      f:write("*\n")
+      f:write("*  $TC Tipo de dados: T"..params.id.." Parâmetro de teste\n")
+      f:write("*\n")
+      f:write("*  $ED Descrição do tipo\n")
+      f:write("*     Parâmetro ou retorno esperado recebido do script de teste.\n")
+      f:write("*     Essa union cria um tipo com capacidade para conter qualquer um\n")
+      f:write("*     dos tipos de parâmetros usados nesse script.\n")
+      f:write("*\n")
+      f:write("***********************************************************************/\n")
+      f:write("\n")
+      imprimir_union_tipos(f)
+      f:write("\n")
+   end
+
+   f:write("/***********************************************************************\n")
+   f:write("*\n")
+   f:write("*  $TC Tipo de dados: cmdFunc\n")
+   f:write("*\n")
+   f:write("*  $ED Descrição do tipo\n")
+   f:write("*     Ponteiro para uma função de tratamento que executa o comando\n")
+   f:write("*     recebido do script.\n")
+   f:write("*\n")
+   f:write("***********************************************************************/\n")
+   f:write("\n")
+   f:write("typedef int ( * cmdFunc ) ( void ) ;\n")
+   f:write("\n")
+   f:write("\n")
+   f:write("/***********************************************************************\n")
+   f:write("*\n")
+   f:write("*  $TC Tipo de dados: T"..params.id.." Descritor do comando de teste\n")
+   f:write("*\n")
+   f:write("*  $ED Descrição do tipo\n")
+   f:write("*     Descreve a associação do comando de teste com a função de\n")
+   f:write("*     tratamento e os parâmetros esperados\n")
+   f:write("*\n")
+   f:write("***********************************************************************/\n")
+   f:write("\n")
+   f:write("typedef struct\n")
+   f:write("{\n")
+   f:write("   const char * Comando;\n")
+   f:write("      /* comando de teste lido do script */\n")
+   f:write("\n")
+   f:write("   char * Params;\n")
+   f:write("      /* lista de parâmetros que será passada para a função\n")
+   f:write("       * LER_LerParametros */\n")
+   f:write("\n")
+   f:write("   cmdFunc Funcao;\n")
+   f:write("      /* função a ser executada para tratar o comando */\n")
+   f:write("\n")
+   f:write("   char * MsgErro;\n")
+   f:write("      /* mensagem de erro que será mostrada em caso de falha */\n")
+   f:write("\n")
+   f:write("} tpComandoTeste;\n")
+   f:write("\n")
+   f:write("\n")
+   f:write("/*****  Protóripos das funções *****/\n")
+   f:write("\n")
+
+   for i,fn in ipairs(params.funcoes) do
+      f:write("static int T"..params.id.."_"..str_util.camel_case(fn.nome).."( void ) ;\n")
+   end
+
+   f:write("\n")
+   f:write("\n")
+   f:write("/*****  Variáveis globais à este módulo  *****/\n")
+   f:write("\n")
+   if params.mult_instan then
+      f:write("/***************************************************************************\n")
+      f:write("*\n")
+      f:write("*  Vetor: Instâncias\n")
+      f:write("*  Descrição: Lista de instâncias do módulo usadas nos testes\n")
+      f:write("*\n")
+      f:write("*  ****/\n")
+      f:write("\n")
+      f:write("static "..params.id.."_tpp"..str_util.camel_case(params.nome).." Instancias[ QTD_INSTANCIAS] = { NULL } ;\n")
+      f:write("\n")
+      f:write("\n")
+   end
+   f:write("/***************************************************************************\n")
+   f:write("*\n")
+   f:write("*  Vetor: Parametros\n")
+   f:write("*  Descrição: Vetor que armazena os parâmetros lidos de um comando no script\n")
+   f:write("*  de teste, juntamente com o retorno esperado.\n")
+   f:write("*\n")
+   f:write("*  ****/\n")
+   f:write("\n")
+   if #tipos > 1 then
+      f:write("static tpParam Parametros[ MAX_PARAMS ] ;\n")
+   else
+      f:write("static int Parametros[ MAX_PARAMS ] ;\n")
+   end
+   f:write("\n")
+   f:write("\n")
+   f:write("/***************************************************************************\n")
+   f:write("*\n")
+   f:write("*  Vetor: Comandos\n")
+   f:write("*  Descrição: Vetor que associa os comandos de teste às funções de tratamento\n")
+   f:write("*  Obs.: Incluir um 'i' no final dos parâmetros para o retorno esperado\n")
+   f:write("*\n")
+   f:write("*  ****/\n")
+   f:write("\n")
+   imprimir_vetor_comandos(f)
 
    f:flush()
    f:close()
