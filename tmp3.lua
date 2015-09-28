@@ -8,9 +8,9 @@ ret = {{"OK", "Rodou OK"},
 
 desc = "le descrição gigantesca para poder testar o line wrap e alinhamento na hora de imprimir os parâmetros no módulo de teste"
 
-p1 = {{"p1", "int", "le param"}, {"p2", "int", desc}}
-p2 = {{"param", "char *", "parâmetro"}}
-p3 = {{"p", "char *", "param"}}
+p1 = {{"m", "MOD_tppModulo", "Instância"}, {"p1", "int", "le param"}, {"p2", "int", desc}}
+p2 = {{"m", "MOD_tppModulo", "Instância"}, {"param", "char *", "parâmetro"}}
+p3 = {{"m", "MOD_tppModulo", "Instância"}, {"p", "char *", "param"}}
 
 autores = {"Nome de Teste", "Outro nome ai"}
 

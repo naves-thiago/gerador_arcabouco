@@ -113,9 +113,9 @@ local function imprimir_cabecalho(f, nome_arq, modulo)
    f:write("*\n")
    f:write("*  $HA Histórico de evolução:\n")
    if #aut <= 5 then
-      f:write("*     Versão  Autor    Data     Observações\n")
+      f:write("*     Versão  Autor  Data       Observações\n")
    else
-      f:write("*     Versão  Autor"..string.rep(" ", #aut -4).."    Data     Observações\n")
+      f:write("*     Versão  Autor"..string.rep(" ", #aut -4).."  Data       Observações\n")
    end
    f:write("*       1.00  "..aut.."   "..os.date("%d/%m/%Y").." Início do desenvolvimento\n")
    f:write("*\n")
@@ -466,21 +466,23 @@ local function imprimir_vetor_comandos(f)
    sc = str_util.right_padding_i(sc)
 
    for i, fn in ipairs(params.funcoes) do
-      p[i] = '"'
-      for j, tp in ipairs(fn.parametros) do
-         p[i] = p[i] .. tipo_to_string(tp[2]):sub(1,1)
-      end
-      p[i] = p[i] .. 'i"'
+			 p[i] = '"'
+			 for j, tp in ipairs(fn.parametros) do
+				 p[i] = p[i] .. tipo_to_string(tp[2]):sub(1,1)
+			 end
+			 p[i] = p[i] .. 'i"'
    end
 
    p = str_util.right_padding_i(p)
 
    for i, fn in ipairs(params.funcoes) do
-      if i ~= #params.funcoes then
-         f:write("   { CMD_"..string.upper(sc[i]).." "..p[i].." , TMAT_"..cc[i]..' "Retorno errado ao " } ,\n')
-      else
-         f:write("   { CMD_"..string.upper(sc[i]).." "..p[i].." , TMAT_"..cc[i]..' "Retorno errado ao " }\n')
-      end
+		 if not fn.privada then
+			 if i ~= #params.funcoes then
+				 f:write("   { CMD_"..string.upper(sc[i]).." "..p[i].." , T"..params.id.."_Cmd"..cc[i]..' "Retorno errado ao " } ,\n')
+			 else
+				 f:write("   { CMD_"..string.upper(sc[i]).." "..p[i].." , T"..params.id.."_Cmd"..cc[i]..' "Retorno errado ao " }\n')
+			 end
+		 end
    end
 
    f:write("} ;\n")
@@ -512,6 +514,44 @@ local function imprimir_union_tipos(f)
    end
    f:write("   "..tipos[#tipos].." "..tipos[#tipos]:sub(1,1).."\n")
    f:write("} tpParam ;\n")
+end
+
+-- Params: fn - função a ser chamada
+local function chamada_funcao_modulo(fn)
+	local out = params.id .. "_"..str_util.camel_case(fn.nome).."("
+	local tipos = lista_tipos()
+	if params.mult_instan then
+		out = out .. " Instancias[ "
+
+		if #tipos > 1 then
+			out = out .. "PARAM_INT( 0 )"
+		else
+			out = out .. "Parametros[ 0 ]"
+		end
+		
+		out = out .. " ] "
+		
+		if #fn.parametros > 1 then
+			out = out .. ","
+		end
+	end
+
+	local i, p
+	for i, p in ipairs(fn.parametros) do
+		if (not params.mult_instan) or (i > 1) then -- Pula o primeiro se tiver múltiplas instâncias
+			if #tipos > 1 then
+				out = out.." PARAM_"..string.upper(tipo_to_string(p[2])).."( "..(i-1).." ) "
+			else
+				out = out.." Parametros[ "..(i-1).." ] "
+			end
+
+			if i < #fn.parametros then
+				out = out .. ","
+			end
+		end
+	end
+
+	return out .. ")"
 end
 
 local function criar_test()
@@ -589,13 +629,8 @@ local function criar_test()
             f:write(prefixo.."Parâmetros:\n")
          end
 
-         local id = 1
-         if params.mult_instan then
-            f:write(prefixo.."1 - Instância: Instância do módulo a ser testada\n")
-            id = 2
-         end
-
          -- Lista os parâmetros
+         local id = 1
          for i,p in ipairs(fn.parametros) do
             if not p[4] then
                linha = tostring(id)
@@ -624,11 +659,10 @@ local function criar_test()
    f:write("#include <assert.h>\n")
    f:write("#include \"tst_espc.h\"\n")
    f:write("#include \"generico.h\"\n")
-   f:write("#include \"lerparam.h\"\n")
+   f:write("#include \"lerparm.h\"\n")
    f:write("#include \""..params.arq_head.."\"\n")
    f:write("\n")
-   f:write("/* Tabela os nomes dos comandos de teste específicos */\n")
-   f:write("\n")
+   f:write("/* Nomes dos comandos de teste específicos */\n")
 
    local maior = 0
    local const
@@ -656,9 +690,13 @@ local function criar_test()
 
    f:write("\n")
    f:write("\n")
+   f:write("/***** Definições utilizados neste módulo de teste *****/\n")
+   f:write("\n")
+   f:write("\n")
 
    if params.mult_instan then
-      f:write("/* Quantidade máxima de instâncias do módulo que podem ser testadas simultaneamente */\n")
+      f:write("/* Quantidade máxima de instâncias do módulo que podem ser testadas\n")
+			f:write(" * simultaneamente */\n")
       f:write("#define QTD_INSTANCIAS 10\n")
       f:write("\n")
    end
@@ -674,6 +712,7 @@ local function criar_test()
       f:write("\n")
    end
 
+   f:write("\n")
    f:write("/***** Tipos de dados utilizados neste módulo de teste *****/\n")
    f:write("\n")
    f:write("\n")
@@ -739,7 +778,9 @@ local function criar_test()
    f:write("\n")
 
    for i,fn in ipairs(params.funcoes) do
-      f:write("static int T"..params.id.."_"..str_util.camel_case(fn.nome).."( void ) ;\n")
+		 if not fn.privada then
+			 f:write("static int T"..params.id.."_Cmd"..str_util.camel_case(fn.nome).."( void ) ;\n")
+		 end
    end
 
    f:write("\n")
@@ -754,7 +795,7 @@ local function criar_test()
       f:write("*\n")
       f:write("*  ****/\n")
       f:write("\n")
-      f:write("static "..params.id.."_tpp"..str_util.camel_case(params.nome).." Instancias[ QTD_INSTANCIAS] = { NULL } ;\n")
+      f:write("static "..params.id.."_tpp"..str_util.camel_case(params.nome).." Instancias[ QTD_INSTANCIAS ] = { NULL } ;\n")
       f:write("\n")
       f:write("\n")
    end
@@ -847,13 +888,36 @@ local function criar_test()
    f:write("\n")
    f:write("      return TST_CondRetNaoConhec ;\n")
    f:write("\n")
-   f:write("   } /* Fim função: TMAT Efetuar operações de teste específicas */\n")
+   f:write("   } /* Fim função: T"..params.id.." Efetuar operações de teste específicas */\n")
    f:write("\n")
    f:write("\n")
    f:write("/*****  Código das funções internas ao módulo  *****/\n")
    f:write("\n")
+   f:write("\n")
 
+	 for i, fn in ipairs(params.funcoes) do
+		 if not fn.privada then
+			 f:write("/***********************************************************************\n")
+			 f:write("*\n")
+			 f:write("*  $FC Função: T"..params.id.." Comando "..fn.nome.."\n")
+			 f:write("*\n")
+			 f:write("*  $ED Descrição da função\n")
+			 f:write("*     Testa \n")
+			 f:write("*\n")
+			 f:write("***********************************************************************/\n")
+			 f:write("\n")
+			 f:write("   static int T"..params.id.."_Cmd"..str_util.camel_case(fn.nome).."( void )\n")
+			 f:write("   {\n")
+			 f:write("\n")
+			 f:write("	    return "..chamada_funcao_modulo(fn).." ;\n")
+			 f:write("\n")
+			 f:write("   } /* Fim função: T"..params.id.." Comando "..fn.nome.." */\n")
+			 f:write("\n")
+			 f:write("\n")
+		 end
+	 end
 
+	 f:write("/********** Fim do módulo de implementação: Módulo de teste específico **********/\n")
 
    f:flush()
    f:close()
