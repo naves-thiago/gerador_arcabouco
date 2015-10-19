@@ -24,39 +24,28 @@ local params = {}
 
 -- Cria os handles dos arquivos
 local function abrir_arquivos()
-   f_code = io.open(params.arq_code, "w")
-   if (f_code == nil) then
-      return false
+   f_code = nil
+   f_header = nil
+   f_code = nil
+   f_script = nil
+
+   if params.arq_code then
+      f_code = io.open(params.arq_code, "w")
    end
 
-   f_header = io.open(params.arq_head, "w")
-   if (f_header == nil) then
-      f_code:close()
-      return false
+   if params.arq_head then
+      f_header = io.open(params.arq_head, "w")
    end
 
-   if (params.arq_test) then
+   if params.arq_test then
       f_test = io.open(params.arq_test, "w")
-      if (f_test == nil) then
-         f_code:close()
-         f_header:close()
-         return false
-      end
    end
 
    --[[
-   if (params.arq_script) then
+   if params.arq_script then
       f_script = io.open(params.arq_script, "w")
-      if (f_script == nil) then
-         f_code:close()
-         f_header:close()
-         f_test:close()
-         return false
-      end
    end
 --]]
-
-   return true
 end
 
 -- Cria uma string com as iniciais do autor
@@ -959,9 +948,7 @@ function criar_modulo(nome, id, testes, mult_instan, cond_ret, funcoes, autores,
    params.arq_test = arq_test
    params.arq_script = arq_script
 
-   if not abrir_arquivos() then
-      return
-   end
+   abrir_arquivos()
 
    local i,fn
    for i,fn in ipairs(funcoes) do
@@ -992,9 +979,23 @@ function criar_modulo(nome, id, testes, mult_instan, cond_ret, funcoes, autores,
       end
    end
 
-   criar_header()
-   criar_code()
-   criar_test()
+   if arq_head then
+      criar_header()
+   end
+
+   if arq_code then
+      criar_code()
+   end
+
+   if arq_test then
+      criar_test()
+   end
+
+   --[[
+   if arq_script then
+      criar_script()
+   end
+   --]]
 end
 
 
