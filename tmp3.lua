@@ -14,10 +14,11 @@ p3 = {{"m", "MOD_tppModulo", "Instância"}, {"p", "char *", "param"}}
 
 autores = {"Nome de Teste", "Outro nome ai"}
 
---func {'Nome da função', 'Descrição',                    Retornos,     Parâmetros,    Nome Teste}
-func = {{"uma função",    "Descrição boladda da função!", {"OK", "E2"}, p1,            "umafunc"},
-        {"func privada",  "Função privada...",            "int",        p2                      },
-        {"mais uma func", "Teste",                        "char *",     p3,            "func"   }}
+--func {'Nome da função',   'Descrição',                      Retornos,     Parâmetros,    Nome Teste}
+func = {{"uma função",      "Descrição boladda da função!",   {"OK", "E2"}, p1,            "umafunc"},
+        {"func privada",    "Função privada...",              "int",        p2                      },
+        {"mais uma func",   "Teste",                          "char *",     p3,            "func"   },
+        {"func sem params", "Teste de função sem parâmetros"                                        }}
 
 --criar_modulo(nome,                id,    testes, mult_instâncias, cond_ret, funcoes, autores, arq_code,   arq_head,   arq_test,    arq_script)
 m.criar_modulo("le awesome módulo", "MOD", true,   true,            ret,      func,    autores, "modulo.c", "modulo.h", "testmod.c", "TesteModulo.script")

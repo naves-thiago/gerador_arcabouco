@@ -24,39 +24,28 @@ local params = {}
 
 -- Cria os handles dos arquivos
 local function abrir_arquivos()
-   f_code = io.open(params.arq_code, "w")
-   if (f_code == nil) then
-      return false
+   f_code = nil
+   f_header = nil
+   f_code = nil
+   f_script = nil
+
+   if params.arq_code then
+      f_code = io.open(params.arq_code, "w")
    end
 
-   f_header = io.open(params.arq_head, "w")
-   if (f_header == nil) then
-      f_code:close()
-      return false
+   if params.arq_head then
+      f_header = io.open(params.arq_head, "w")
    end
 
-   if (params.arq_test) then
+   if params.arq_test then
       f_test = io.open(params.arq_test, "w")
-      if (f_test == nil) then
-         f_code:close()
-         f_header:close()
-         return false
-      end
    end
 
    --[[
-   if (params.arq_script) then
+   if params.arq_script then
       f_script = io.open(params.arq_script, "w")
-      if (f_script == nil) then
-         f_code:close()
-         f_header:close()
-         f_test:close()
-         return false
-      end
    end
 --]]
-
-   return true
 end
 
 -- Cria uma string com as iniciais do autor
@@ -202,7 +191,9 @@ local function imprimir_func_header(f, fn, id)
          f:write("*     "..id.."_CondRet"..ret.."\n")
       end
    else
-      f:write("*     "..fn.retornos.." - \n")
+      if type(fn.retornos) == "string" then
+         f:write("*     "..fn.retornos.." - \n")
+      end
    end
    f:write("*\n")
    f:write("***********************************************************************/\n")
@@ -466,25 +457,25 @@ local function imprimir_vetor_comandos(f)
    sc = str_util.right_padding_i(sc)
 
    for i, fn in ipairs(params.funcoes) do
-          p[i] = '"'
-          if fn.parametros then
-             for j, tp in ipairs(fn.parametros) do
-                p[i] = p[i] .. tipo_to_string(tp[2]):sub(1,1)
-             end
-          end
-          p[i] = p[i] .. 'i"'
+      p[i] = '"'
+      if fn.parametros then
+         for j, tp in ipairs(fn.parametros) do
+            p[i] = p[i] .. tipo_to_string(tp[2]):sub(1,1)
+         end
+      end
+      p[i] = p[i] .. 'i"'
    end
 
    p = str_util.right_padding_i(p)
 
    for i, fn in ipairs(params.funcoes) do
-       if not fn.privada then
-          if i ~= #params.funcoes then
-             f:write("   { CMD_"..string.upper(sc[i]).." "..p[i].." , T"..params.id.."_Cmd"..cc[i]..' "Retorno errado ao " } ,\n')
-          else
-             f:write("   { CMD_"..string.upper(sc[i]).." "..p[i].." , T"..params.id.."_Cmd"..cc[i]..' "Retorno errado ao " }\n')
-          end
-       end
+      if not fn.privada then
+         if i ~= #params.funcoes then
+            f:write("   { CMD_"..string.upper(sc[i]).." "..p[i].." , T"..params.id.."_Cmd"..cc[i]..' "Retorno errado ao " } ,\n')
+         else
+            f:write("   { CMD_"..string.upper(sc[i]).." "..p[i].." , T"..params.id.."_Cmd"..cc[i]..' "Retorno errado ao " }\n')
+         end
+      end
    end
 
    f:write("} ;\n")
@@ -494,7 +485,7 @@ local function obter_max_params()
    local i, fn
    local max = 0
    for i, fn in ipairs(params.funcoes) do
-      if #fn.parametros > max then
+      if fn.parametros and #fn.parametros > max then
          max = #fn.parametros
       end
    end
@@ -538,19 +529,17 @@ local function chamada_funcao_modulo(fn)
       end
    end
 
-   if fn.parametros then
-      local i, p
-      for i, p in ipairs(fn.parametros) do
-         if (not params.mult_instan) or (i > 1) then -- Pula o primeiro se tiver múltiplas instâncias
-            if #tipos > 1 then
-               out = out.." PARAM_"..string.upper(tipo_to_string(p[2])).."( "..(i-1).." ) "
-            else
-               out = out.." Parametros[ "..(i-1).." ] "
-            end
+   local i, p
+   for i, p in ipairs(fn.parametros) do
+      if (not params.mult_instan) or (i > 1) then -- Pula o primeiro se tiver múltiplas instâncias
+         if #tipos > 1 then
+            out = out.." PARAM_"..string.upper(tipo_to_string(p[2])).."( "..(i-1).." ) "
+         else
+            out = out.." Parametros[ "..(i-1).." ] "
+         end
 
-            if i < #fn.parametros then
-               out = out .. ","
-            end
+         if i < #fn.parametros then
+            out = out .. ","
          end
       end
    end
@@ -702,7 +691,7 @@ local function criar_test()
 
    if params.mult_instan then
       f:write("/* Quantidade máxima de instâncias do módulo que podem ser testadas\n")
-         f:write(" * simultaneamente */\n")
+      f:write(" * simultaneamente */\n")
       f:write("#define QTD_INSTANCIAS 10\n")
       f:write("\n")
    end
@@ -784,9 +773,9 @@ local function criar_test()
    f:write("\n")
 
    for i,fn in ipairs(params.funcoes) do
-       if not fn.privada then
-          f:write("static int T"..params.id.."_Cmd"..str_util.camel_case(fn.nome).."( void ) ;\n")
-       end
+      if not fn.privada then
+         f:write("static int T"..params.id.."_Cmd"..str_util.camel_case(fn.nome).."( void ) ;\n")
+      end
    end
 
    f:write("\n")
@@ -965,9 +954,7 @@ function criar_modulo(nome, id, testes, mult_instan, cond_ret, funcoes, autores,
    params.arq_test = arq_test
    params.arq_script = arq_script
 
-   if not abrir_arquivos() then
-      return
-   end
+   abrir_arquivos()
 
    local i,fn
    for i,fn in ipairs(funcoes) do
@@ -998,9 +985,23 @@ function criar_modulo(nome, id, testes, mult_instan, cond_ret, funcoes, autores,
       end
    end
 
-   criar_header()
-   criar_code()
-   criar_test()
+   if arq_head then
+      criar_header()
+   end
+
+   if arq_code then
+      criar_code()
+   end
+
+   if arq_test then
+      criar_test()
+   end
+
+   --[[
+   if arq_script then
+      criar_script()
+   end
+   --]]
 end
 
 
