@@ -419,7 +419,7 @@ local function lista_tipos()
 
       local i,f,j,p
       for i,f in pairs(params.funcoes) do
-         if not f.privada then
+         if not f.privada and f.parametros then
             for j,p in pairs(f.parametros) do
                tipos[ tipo_to_string(p[2]) ] = true
             end
@@ -466,23 +466,25 @@ local function imprimir_vetor_comandos(f)
    sc = str_util.right_padding_i(sc)
 
    for i, fn in ipairs(params.funcoes) do
-			 p[i] = '"'
-			 for j, tp in ipairs(fn.parametros) do
-				 p[i] = p[i] .. tipo_to_string(tp[2]):sub(1,1)
-			 end
-			 p[i] = p[i] .. 'i"'
+          p[i] = '"'
+          if fn.parametros then
+             for j, tp in ipairs(fn.parametros) do
+                p[i] = p[i] .. tipo_to_string(tp[2]):sub(1,1)
+             end
+          end
+          p[i] = p[i] .. 'i"'
    end
 
    p = str_util.right_padding_i(p)
 
    for i, fn in ipairs(params.funcoes) do
-		 if not fn.privada then
-			 if i ~= #params.funcoes then
-				 f:write("   { CMD_"..string.upper(sc[i]).." "..p[i].." , T"..params.id.."_Cmd"..cc[i]..' "Retorno errado ao " } ,\n')
-			 else
-				 f:write("   { CMD_"..string.upper(sc[i]).." "..p[i].." , T"..params.id.."_Cmd"..cc[i]..' "Retorno errado ao " }\n')
-			 end
-		 end
+       if not fn.privada then
+          if i ~= #params.funcoes then
+             f:write("   { CMD_"..string.upper(sc[i]).." "..p[i].." , T"..params.id.."_Cmd"..cc[i]..' "Retorno errado ao " } ,\n')
+          else
+             f:write("   { CMD_"..string.upper(sc[i]).." "..p[i].." , T"..params.id.."_Cmd"..cc[i]..' "Retorno errado ao " }\n')
+          end
+       end
    end
 
    f:write("} ;\n")
@@ -518,40 +520,42 @@ end
 
 -- Params: fn - função a ser chamada
 local function chamada_funcao_modulo(fn)
-	local out = params.id .. "_"..str_util.camel_case(fn.nome).."("
-	local tipos = lista_tipos()
-	if params.mult_instan then
-		out = out .. " Instancias[ "
+   local out = params.id .. "_"..str_util.camel_case(fn.nome).."("
+   local tipos = lista_tipos()
+   if params.mult_instan then
+      out = out .. " Instancias[ "
 
-		if #tipos > 1 then
-			out = out .. "PARAM_INT( 0 )"
-		else
-			out = out .. "Parametros[ 0 ]"
-		end
-		
-		out = out .. " ] "
-		
-		if #fn.parametros > 1 then
-			out = out .. ","
-		end
-	end
+      if #tipos > 1 then
+         out = out .. "PARAM_INT( 0 )"
+      else
+         out = out .. "Parametros[ 0 ]"
+      end
 
-	local i, p
-	for i, p in ipairs(fn.parametros) do
-		if (not params.mult_instan) or (i > 1) then -- Pula o primeiro se tiver múltiplas instâncias
-			if #tipos > 1 then
-				out = out.." PARAM_"..string.upper(tipo_to_string(p[2])).."( "..(i-1).." ) "
-			else
-				out = out.." Parametros[ "..(i-1).." ] "
-			end
+      out = out .. " ] "
 
-			if i < #fn.parametros then
-				out = out .. ","
-			end
-		end
-	end
+      if #fn.parametros > 1 then
+         out = out .. ","
+      end
+   end
 
-	return out .. ")"
+   if fn.parametros then
+      local i, p
+      for i, p in ipairs(fn.parametros) do
+         if (not params.mult_instan) or (i > 1) then -- Pula o primeiro se tiver múltiplas instâncias
+            if #tipos > 1 then
+               out = out.." PARAM_"..string.upper(tipo_to_string(p[2])).."( "..(i-1).." ) "
+            else
+               out = out.." Parametros[ "..(i-1).." ] "
+            end
+
+            if i < #fn.parametros then
+               out = out .. ","
+            end
+         end
+      end
+   end
+
+   return out .. ")"
 end
 
 local function criar_test()
@@ -630,20 +634,22 @@ local function criar_test()
          end
 
          -- Lista os parâmetros
-         local id = 1
-         for i,p in ipairs(fn.parametros) do
-            if not p[4] then
-               linha = tostring(id)
+         if fn.parametros then
+            local id = 1
+            for i,p in ipairs(fn.parametros) do
+               if not p[4] then
+                  linha = tostring(id)
 
-               linha = linha.." - "..p[1]..": "
-               f:write(prefixo..linha)
+                  linha = linha.." - "..p[1]..": "
+                  f:write(prefixo..linha)
 
-               local desc -- descrição
-               desc = str_util.line_wrap_with_prefix(p[3], limite - #linha - #prefixo,
-               prefixo..string.rep(" ", #linha))
-               desc = desc:sub(#linha + #prefixo + 1, #desc)
-               f:write(desc)
-               id = id + 1
+                  local desc -- descrição
+                  desc = str_util.line_wrap_with_prefix(p[3], limite - #linha - #prefixo,
+                  prefixo..string.rep(" ", #linha))
+                  desc = desc:sub(#linha + #prefixo + 1, #desc)
+                  f:write(desc)
+                  id = id + 1
+               end
             end
          end
 
@@ -696,7 +702,7 @@ local function criar_test()
 
    if params.mult_instan then
       f:write("/* Quantidade máxima de instâncias do módulo que podem ser testadas\n")
-			f:write(" * simultaneamente */\n")
+         f:write(" * simultaneamente */\n")
       f:write("#define QTD_INSTANCIAS 10\n")
       f:write("\n")
    end
@@ -778,9 +784,9 @@ local function criar_test()
    f:write("\n")
 
    for i,fn in ipairs(params.funcoes) do
-		 if not fn.privada then
-			 f:write("static int T"..params.id.."_Cmd"..str_util.camel_case(fn.nome).."( void ) ;\n")
-		 end
+       if not fn.privada then
+          f:write("static int T"..params.id.."_Cmd"..str_util.camel_case(fn.nome).."( void ) ;\n")
+       end
    end
 
    f:write("\n")
@@ -895,29 +901,29 @@ local function criar_test()
    f:write("\n")
    f:write("\n")
 
-	 for i, fn in ipairs(params.funcoes) do
-		 if not fn.privada then
-			 f:write("/***********************************************************************\n")
-			 f:write("*\n")
-			 f:write("*  $FC Função: T"..params.id.." Comando "..fn.nome.."\n")
-			 f:write("*\n")
-			 f:write("*  $ED Descrição da função\n")
-			 f:write("*     Testa \n")
-			 f:write("*\n")
-			 f:write("***********************************************************************/\n")
-			 f:write("\n")
-			 f:write("   static int T"..params.id.."_Cmd"..str_util.camel_case(fn.nome).."( void )\n")
-			 f:write("   {\n")
-			 f:write("\n")
-			 f:write("	    return "..chamada_funcao_modulo(fn).." ;\n")
-			 f:write("\n")
-			 f:write("   } /* Fim função: T"..params.id.." Comando "..fn.nome.." */\n")
-			 f:write("\n")
-			 f:write("\n")
-		 end
-	 end
+   for i, fn in ipairs(params.funcoes) do
+      if not fn.privada then
+         f:write("/***********************************************************************\n")
+         f:write("*\n")
+         f:write("*  $FC Função: T"..params.id.." Comando "..fn.nome.."\n")
+         f:write("*\n")
+         f:write("*  $ED Descrição da função\n")
+         f:write("*     Testa \n")
+         f:write("*\n")
+         f:write("***********************************************************************/\n")
+         f:write("\n")
+         f:write("   static int T"..params.id.."_Cmd"..str_util.camel_case(fn.nome).."( void )\n")
+         f:write("   {\n")
+         f:write("\n")
+         f:write("       return "..chamada_funcao_modulo(fn).." ;\n")
+         f:write("\n")
+         f:write("   } /* Fim função: T"..params.id.." Comando "..fn.nome.." */\n")
+         f:write("\n")
+         f:write("\n")
+      end
+   end
 
-	 f:write("/********** Fim do módulo de implementação: Módulo de teste específico **********/\n")
+   f:write("/********** Fim do módulo de implementação: Módulo de teste específico **********/\n")
 
    f:flush()
    f:close()
