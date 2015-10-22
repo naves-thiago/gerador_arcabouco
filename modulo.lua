@@ -116,11 +116,22 @@ end
 
 -- params: file, função
 local function imprimir_prototipo(f, fn, id)
+   f:write("   ")
+
+   -- static?
+   if fn.privada then
+      f:write("static ")
+   end
+
    -- imrprime tipo de retorno
-   if type(fn.retornos) == "string" then
-      f:write("   "..fn.retornos.." ")
+   if fn.retornos == nil then
+      f:write("void ")
    else
-      f:write("   "..id.."_tpCondRet ")
+      if type(fn.retornos) == "string" then
+         f:write(fn.retornos.." ")
+      else
+         f:write(id.."_tpCondRet ")
+      end
    end
 
    if fn.privada then
@@ -212,31 +223,34 @@ local function criar_header()
    f:write("#define "..define.."_\n")
    imprimir_cabecalho(f, params.arq_head, params.nome)
    f:write("\n")
-   f:write("\n")
-   f:write("/***********************************************************************\n")
-   f:write("*\n")
-   f:write("*  $TC Tipo de dados: "..id.." Condições de retorno\n")
-   f:write("*\n")
-   f:write("*\n")
-   f:write("***********************************************************************/\n")
-   f:write("\n")
-   f:write("   typedef enum {\n")
-   f:write("\n")
 
-   local cr
-   for cr = 1,#params.cond_ret-1 do
-      f:write("      "..id.."_CondRet"..params.cond_ret[cr][1].." = "..tostring(cr-1).." ,\n")
+   if params.cond_ret then
+      f:write("\n")
+      f:write("/***********************************************************************\n")
+      f:write("*\n")
+      f:write("*  $TC Tipo de dados: "..id.." Condições de retorno\n")
+      f:write("*\n")
+      f:write("*\n")
+      f:write("***********************************************************************/\n")
+      f:write("\n")
+      f:write("   typedef enum {\n")
+      f:write("\n")
+
+      local cr
+      for cr = 1,#params.cond_ret-1 do
+         f:write("      "..id.."_CondRet"..params.cond_ret[cr][1].." = "..tostring(cr-1).." ,\n")
+         f:write("          /* "..params.cond_ret[cr][2].." */\n")
+         f:write("\n")
+      end
+      -- não colocar vírgula no último
+      cr = #params.cond_ret
+      f:write("      "..id.."_CondRet"..params.cond_ret[cr][1].." = "..tostring(cr-1).."\n")
       f:write("          /* "..params.cond_ret[cr][2].." */\n")
       f:write("\n")
-   end
--- não colocar vírgula no último
-   cr = #params.cond_ret
-   f:write("      "..id.."_CondRet"..params.cond_ret[cr][1].." = "..tostring(cr-1).."\n")
-   f:write("          /* "..params.cond_ret[cr][2].." */\n")
-   f:write("\n")
 
-   f:write("   } "..id.."_tpCondRet ;\n")
-   f:write("\n")
+      f:write("   } "..id.."_tpCondRet ;\n")
+      f:write("\n")
+   end
    f:write("\n")
 
    local i, fn
@@ -281,7 +295,9 @@ local function criar_code()
    f:write("\n")
    f:write('#include   <stdio.h>\n')
    f:write('#include   <stdlib.h>\n')
-   f:write('#include   "'..params.arq_head..'"\n')
+   if params.arq_head then
+      f:write('#include   "'..params.arq_head..'"\n')
+   end
    f:write("\n")
 
 -- Protótipos das funções privadas / static
