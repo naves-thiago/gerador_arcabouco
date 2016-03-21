@@ -1,6 +1,6 @@
 m=require("modulo")
 
--- Códigos de retorno possíveis para o arcabou
+-- Códigos de retorno possíveis para o arcabouço
 --ret= {"Nome", 'Descrição'}
 ret = {{"OK", "Rodou OK"},
        {"E1", "Erro 1"},
