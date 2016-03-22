@@ -114,6 +114,15 @@ local function imprimir_cabecalho(f, nome_arq, modulo)
    f:write("***********************************************************************/\n")
 end
 
+-- Transforma um vetor {"Nome", "tipo", "descrição"} na string "tipo nome"}
+local function param_to_string(p)
+   if p[2] == "string" then
+      return "char * "..p[1]
+   else
+      return p[2].." "..p[1]
+   end
+end
+
 -- params: file, função
 local function imprimir_prototipo(f, fn, id)
    f:write("   ")
@@ -144,10 +153,10 @@ local function imprimir_prototipo(f, fn, id)
       f:write("void )") -- nenhum parâmetro
    else
       -- Primeiro parâmetro sem vírgula antes
-      f:write(fn.parametros[1][2].." "..fn.parametros[1][1])
+      f:write(param_to_string(fn.parametros[1]))
       for p = 2,#fn.parametros do
          -- fn.parametros[p] = {"Nome", "tipo", "descrição"}
-         f:write(" , "..fn.parametros[p][2].." "..fn.parametros[p][1])
+         f:write(" , "..param_to_string(fn.parametros[p]))
       end
       f:write(" )")
    end
@@ -203,7 +212,7 @@ local function imprimir_func_header(f, fn, id)
       end
    else
       if type(fn.retornos) == "string" then
-         f:write("*     "..fn.retornos.." - \n")
+         f:write("*\n")
       end
    end
    f:write("*\n")
@@ -366,9 +375,12 @@ local function tipo_to_string(tipo)
    local ret = string.lower(string.gsub(tipo," ",""))
    local conv = {}
 
-   conv["char"]    = "char"
-   conv["char*"]   = "string"
-   conv["default"] = "int"
+   conv["char"]     = "char"
+   conv["char*"]    = "string"
+   conv["string"]   = "string"
+   conv["double"]   = "double"
+   conv["float"]    = "double"
+   conv["default"]  = "int"
 
    if conv[ret] then
       return conv[ret]
@@ -419,6 +431,7 @@ local function params_teste_to_string(fn)
 end
 
 local tipos_params
+local tipos_params_count = 0
 local function lista_tipos()
    -- global tipos_params guarda a lista de tipos para evitar recriar a lista
    if not tipos_params then
@@ -435,10 +448,11 @@ local function lista_tipos()
 
       tipos["int"] = true -- Sempre deve ter o int para a condição de retorno
 
-      tipos_params = {}
       for i,j in pairs(tipos) do
-         table.insert(tipos_params, i)
+         tipos_params_count = tipos_params_count + 1
       end
+
+      tipos_params = tipos
    end
 
    return tipos_params
@@ -446,11 +460,15 @@ end
 
 -- Params: f - arquivo
 local function imprimir_macros_typecast(f)
-   -- TODO tratar o caso do tipo string
    local i, t
    local tipos = lista_tipos()
-   for i, t in ipairs(tipos) do
-      f:write("#define PARAM_"..string.upper(t).."( p ) ( *( "..t.." * ) &Parametros[ p ] )\n")
+
+   for t, i in pairs(tipos) do
+      if t == "string" then
+         f:write("#define PARAM_STRING( p ) ( *( char ** ) &Parametros[ p ] )\n")
+      else
+         f:write("#define PARAM_"..string.upper(t).."( p ) ( *( "..t.." * ) &Parametros[ p ] )\n")
+      end
    end
 end
 
@@ -518,21 +536,23 @@ local function imprimir_union_tipos(f)
    f:write("typedef union\n")
    f:write("{\n")
 
-   for t=1, #tipos -1 do
-      f:write("   "..tipos[t].." "..tipos[t]:sub(1,1).." ,\n")
+   for t, i in pairs(tipos) do
+      if t == "string" then
+         f:write("   char "..t:sub(1,1).."[ MAX_STR_LEN ] ;\n")
+      else
+         f:write("   "..t.." "..t:sub(1,1).." ;\n")
+      end
    end
-   f:write("   "..tipos[#tipos].." "..tipos[#tipos]:sub(1,1).."\n")
    f:write("} tpParam ;\n")
 end
 
 -- Params: fn - função a ser chamada
 local function chamada_funcao_modulo(fn)
    local out = params.id .. "_"..str_util.camel_case(fn.nome).."("
-   local tipos = lista_tipos()
    if params.mult_instan then
       out = out .. " Instancias[ "
 
-      if #tipos > 1 then
+      if tipos_params_count > 1 then
          out = out .. "PARAM_INT( 0 )"
       else
          out = out .. "Parametros[ 0 ]"
@@ -548,7 +568,7 @@ local function chamada_funcao_modulo(fn)
    local i, p
    for i, p in ipairs(fn.parametros) do
       if (not params.mult_instan) or (i > 1) then -- Pula o primeiro se tiver múltiplas instâncias
-         if #tipos > 1 then
+         if tipos_params_count > 1 then
             out = out.." PARAM_"..string.upper(tipo_to_string(p[2])).."( "..(i-1).." ) "
          else
             out = out.." Parametros[ "..(i-1).." ] "
@@ -717,7 +737,13 @@ local function criar_test()
    f:write("#define MAX_PARAMS "..(obter_max_params()+1).."\n")
    f:write("\n")
 
-   if #tipos > 1 then
+   if tipos["string"] then
+      f:write("/* Tamanho máximo de uma string usada como parâmetro no script de teste */\n")
+      f:write("#define MAX_STR_LEN 100\n");
+      f:write("\n")
+   end
+
+   if tipos_params_count > 1 then
       f:write("/* Macros de typecast dos parâmetros */\n")
       imprimir_macros_typecast(f)
       f:write("\n")
@@ -728,7 +754,7 @@ local function criar_test()
    f:write("\n")
    f:write("\n")
 
-   if #tipos > 1 then
+   if tipos_params_count > 1 then
       f:write("/***********************************************************************\n")
       f:write("*\n")
       f:write("*  $TC Tipo de dados: T"..params.id.." Parâmetro de teste\n")
@@ -818,7 +844,7 @@ local function criar_test()
    f:write("*\n")
    f:write("*  ****/\n")
    f:write("\n")
-   if #tipos > 1 then
+   if tipos_params_count > 1 then
       f:write("static tpParam Parametros[ MAX_PARAMS ] ;\n")
    else
       f:write("static int Parametros[ MAX_PARAMS ] ;\n")
@@ -879,11 +905,17 @@ local function criar_test()
    end
    f:write("                                                &Parametros[ "..obter_max_params().." ] ) ;\n")
    f:write("\n")
+   local param0
+   if tipos_params_count > 1 then
+      param0 = "PARAM_INT( 0 )"
+   else
+      param0 = "Parametros[ 0 ]"
+   end
    if params.mult_instan then
       f:write("            /* Parametros[ 0 ] é o número da instância do módulo */\n")
       f:write("            if ( ( qtdParamsLidos != qtdParamsEsperados )\n")
-      f:write("              || ( Parametros[ 0 ] < 0 )\n")
-      f:write("              || ( Parametros[ 0 ] >= QTD_INSTANCIAS ) )\n")
+      f:write("              || ( "..param0.." < 0 )\n")
+      f:write("              || ( "..param0.." >= QTD_INSTANCIAS ) )\n")
    else
       f:write("            if ( qtdParamsLidos != qtdParamsEsperados )\n")
    end
@@ -892,7 +924,11 @@ local function criar_test()
    f:write("            } /* if */\n")
    f:write("\n")
    f:write("            /* O Retorno esperado é lido como o último parâmetro */\n")
-   f:write("            return TST_CompararInt( Parametros[ qtdParamsLidos - 1 ] , Comandos[ cmd ].Funcao() ,\n")
+   if tipos_params_count > 1 then
+      f:write("            return TST_CompararInt( PARAM_INT( qtdParamsLidos - 1 ) , Comandos[ cmd ].Funcao() ,\n")
+   else
+      f:write("            return TST_CompararInt( Parametros[ qtdParamsLidos - 1 ] , Comandos[ cmd ].Funcao() ,\n")
+   end
    f:write("                                    Comandos[ cmd ].MsgErro ) ;\n")
    f:write("         } /* if */\n")
    f:write("      } /* for */\n")
